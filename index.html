@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シードマップ - Canvasベース</title>
+    <style>
+        /* 余白をなくし、画面いっぱいにCanvasを表示 */
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #2c3e50; /* マップ外の背景色 */
+        }
+        canvas {
+            display: block;
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing; /* ドラッグ中のカーソル */
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="mapCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 画面サイズにCanvasを合わせる
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- マップの視点情報（カメラ） ---
+        let cameraX = 0;    // カメラのX座標（オフセット）
+        let cameraY = 0;    // カメラのY座標（オフセット）
+        let scale = 1;      // ズーム倍率
+
+        // --- ドラッグ操作の変数 ---
+        let isDragging = false;
+        let startX, startY;
+
+        // --- 描画処理 ---
+        function draw() {
+            // 画面をクリア
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            
+            // 画面の中心を基準にするための移動
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            // ズームの適用
+            ctx.scale(scale, scale);
+            // カメラ位置の適用（ドラッグによる移動）
+            ctx.translate(-cameraX, -cameraY);
+
+            // 【ここにマップを描画します】
+            // 今回はテストとして、マイクラのチャンクに見立てたグリッドを描画
+            drawGrid();
+
+            ctx.restore();
+        }
+
+        // テスト用のグリッド描画関数
+        function drawGrid() {
+            const chunkSize = 16; // 1マスのサイズ
+            const mapSize = 50;   // 縦横何マス描くか（テスト用）
+            
+            const startOffset = -(chunkSize * mapSize) / 2;
+
+            ctx.lineWidth = 1;
+            
+            for (let x = 0; x < mapSize; x++) {
+                for (let y = 0; y < mapSize; y++) {
+                    const drawX = startOffset + (x * chunkSize);
+                    const drawY = startOffset + (y * chunkSize);
+
+                    // チェッカーボード模様にする
+                    ctx.fillStyle = (x + y) % 2 === 0 ? '#8e44ad' : '#9b59b6';
+                    ctx.fillRect(drawX, drawY, chunkSize, chunkSize);
+                    
+                    // 枠線
+                    ctx.strokeStyle = '#732d91';
+                    ctx.strokeRect(drawX, drawY, chunkSize, chunkSize);
+                }
+            }
+            
+            // 中心点の目印（0, 0 座標）
+            ctx.fillStyle = '#f1c40f';
+            ctx.beginPath();
+            ctx.arc(0, 0, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // --- イベントリスナー（マウス・タッチ操作） ---
+
+        // PointerEventsを使うと、マウスとタッチ（スマホ）の両方に一括対応できます
+        canvas.addEventListener('pointerdown', (e) => {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            canvas.setPointerCapture(e.pointerId); // カーソルが外れてもドラッグを継続
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (!isDragging) return;
+
+            // 移動量を計算
+            const dx = (e.clientX - startX) / scale;
+            const dy = (e.clientY - startY) / scale;
+
+            // カメラ位置を更新
+            cameraX -= dx;
+            cameraY -= dy;
+
+            // 次の計算のために開始位置を更新
+            startX = e.clientX;
+            startY = e.clientY;
+
+            // 再描画
+            draw();
+        });
+
+        canvas.addEventListener('pointerup', (e) => {
+            isDragging = false;
+            canvas.releasePointerCapture(e.pointerId);
+        });
+
+        // --- マウスホイールでのズーム操作 ---
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault(); // デフォルトのスクロールを無効化
+
+            const zoomSensitivity = 0.001;
+            // ホイールの回転量に応じてスケールを変更
+            const zoomAmount = e.deltaY * zoomSensitivity;
+            
+            scale -= zoomAmount;
+            
+            // 拡大縮小の限界を設定
+            scale = Math.max(0.2, Math.min(scale, 5));
+
+            draw();
+        }, { passive: false }); // e.preventDefault()を許可するために必要
+
+        // 初期化実行
+        resizeCanvas();
+
+    </script>
+</body>
+</html>
